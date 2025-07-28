@@ -29,7 +29,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
 
 // Set up worker to avoid issues with bundlers
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 interface PdfViewerProps {
   file: File;
