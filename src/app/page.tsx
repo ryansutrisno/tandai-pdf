@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), {
   ssr: false,
@@ -77,6 +78,9 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4 font-body transition-colors duration-300">
+        <div className="absolute top-4 right-4">
+            <ThemeToggle />
+        </div>
       <div 
         className="w-full max-w-2xl text-center"
         onDrop={handleFileDrop}

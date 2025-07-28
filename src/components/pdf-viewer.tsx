@@ -17,6 +17,7 @@ import {
   Loader2,
   Search,
   ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // Set up worker to avoid issues with bundlers
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -223,7 +225,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
 
   const textRenderer = useCallback((textItem: any) => {
     if (!searchQuery) return textItem.str;
-    const regex = new RegExp(`(${searchQuery})`, 'gi');
+    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
     return textItem.str.replace(regex, (match: string) => `<mark>${match}</mark>`);
   }, [searchQuery]);
   
@@ -280,7 +282,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToNextResult}><ChevronRight/></Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToNextResult}><ChevronDown/></Button>
                             </TooltipTrigger>
                             <TooltipContent><p>Next Match</p></TooltipContent>
                         </Tooltip>
@@ -295,6 +297,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                     <TooltipContent><p>Toggle Fullscreen</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
+             <ThemeToggle />
         </div>
       </header>
 
