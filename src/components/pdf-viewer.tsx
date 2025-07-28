@@ -43,27 +43,6 @@ interface DocInfo {
   zoom: number;
 }
 
-const PdfViewerLoading = () => (
-    <div className="flex flex-col h-screen w-screen bg-background">
-        <header className="flex items-center justify-between p-2 border-b bg-card shadow-sm z-10">
-            <Skeleton className="h-10 w-10" />
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-10 w-10" />
-        </header>
-        <main className="flex-1 overflow-hidden p-4 flex justify-center">
-            <Skeleton className="h-full w-full max-w-4xl" />
-        </main>
-        <footer className="p-2 border-t bg-card shadow-sm z-10">
-            <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-                <Skeleton className="h-10 w-32" />
-                <Skeleton className="h-10 w-48" />
-                <Skeleton className="h-10 w-32" />
-            </div>
-        </footer>
-    </div>
-)
-
-
 export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -72,18 +51,12 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const { toast } = useToast();
   const viewerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
   
   const storageKey = `tandai-pdf-${file.name}`;
 
   // Load state from localStorage
   useEffect(() => {
-    if(!isClient) return;
     try {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
@@ -105,11 +78,11 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         variant: "destructive",
       });
     }
-  }, [file, storageKey, toast, isClient]);
+  }, [file, storageKey, toast]);
 
   // Save state to localStorage
   useEffect(() => {
-    if(!isClient || isLoading) return;
+    if(isLoading) return;
     
     const saveState = () => {
       try {
@@ -127,7 +100,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
     
     const handler = setTimeout(saveState, 500);
     return () => clearTimeout(handler);
-  }, [pageNumber, bookmarks, zoom, storageKey, isClient, isLoading]);
+  }, [pageNumber, bookmarks, zoom, storageKey, isLoading]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -170,10 +143,6 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   }
   
   const isBookmarked = bookmarks.includes(pageNumber);
-
-  if (!isClient) {
-    return <PdfViewerLoading />;
-  }
 
   return (
     <div ref={containerRef} className="flex flex-col h-screen w-screen bg-background text-foreground font-body">
