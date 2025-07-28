@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import type { PDFDocumentProxy, TextItem } from 'pdfjs-dist/types/src/display/api';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import {
@@ -14,6 +15,8 @@ import {
   ArrowLeft,
   Expand,
   Loader2,
+  Search,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +49,11 @@ interface DocInfo {
   zoom: number;
 }
 
+interface SearchResult {
+  pageNumber: number;
+  // We don't need detailed position info for now, just navigating is enough
+}
+
 export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -56,6 +64,12 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState(-1);
+  const [isSearching, setIsSearching] = useState(false);
+  const pdfRef = useRef<PDFDocumentProxy | null>(null);
+
   const storageKey = `tandai-pdf-${file.name}`;
 
   // Load state from localStorage
@@ -89,9 +103,10 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
     
     const saveState = () => {
       try {
+        if (!viewerRef.current) return;
         const state: DocInfo = {
           page: pageNumber,
-          scrollTop: viewerRef.current?.scrollTop || 0,
+          scrollTop: viewerRef.current.scrollTop,
           bookmarks,
           zoom
         };
@@ -105,8 +120,9 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
     return () => clearTimeout(handler);
   }, [pageNumber, bookmarks, zoom, storageKey, isLoading]);
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
+  const onDocumentLoadSuccess = (pdf: PDFDocumentProxy) => {
+    pdfRef.current = pdf;
+    setNumPages(pdf.numPages);
     setIsLoading(false);
   };
 
@@ -128,7 +144,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
       
       toast({
         title: prev.includes(pageNumber) ? "Bookmark removed" : "Bookmark added",
-        description: `Page ${pageNumber} is no longer bookmarked.`,
+        description: `Page ${pageNumber} has ${prev.includes(pageNumber) ? 'been unbookmarked' : 'been bookmarked'}.`,
       });
 
       return newBookmarks.sort((a, b) => a - b);
@@ -144,6 +160,72 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
       }
     }
   }
+
+  const handleSearch = async () => {
+      if (!searchQuery || !pdfRef.current) {
+          setSearchResults([]);
+          setCurrentResultIndex(-1);
+          return;
+      }
+      setIsSearching(true);
+      const results: SearchResult[] = [];
+      const searchText = searchQuery.toLowerCase();
+
+      try {
+          for (let i = 1; i <= pdfRef.current.numPages; i++) {
+              const page = await pdfRef.current.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map(item => (item as TextItem).str).join(' ').toLowerCase();
+
+              if (pageText.includes(searchText)) {
+                  // Simple search: just add the page number if found
+                  // For more complex search, we'd need to find specific matches
+                  results.push({ pageNumber: i });
+              }
+          }
+
+          setSearchResults(results);
+          if (results.length > 0) {
+              setCurrentResultIndex(0);
+              setPageNumber(results[0].pageNumber);
+          } else {
+              setCurrentResultIndex(-1);
+              toast({
+                  title: "Not Found",
+                  description: `The phrase "${searchQuery}" was not found in the document.`,
+              });
+          }
+      } catch (error) {
+          console.error("Error during search:", error);
+          toast({
+              title: "Search Error",
+              description: "An error occurred while searching the document.",
+              variant: "destructive",
+          });
+      } finally {
+          setIsSearching(false);
+      }
+  };
+
+  const goToNextResult = () => {
+      if (searchResults.length === 0) return;
+      const nextIndex = (currentResultIndex + 1) % searchResults.length;
+      setCurrentResultIndex(nextIndex);
+      setPageNumber(searchResults[nextIndex].pageNumber);
+  };
+
+  const goToPrevResult = () => {
+      if (searchResults.length === 0) return;
+      const prevIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
+      setCurrentResultIndex(prevIndex);
+      setPageNumber(searchResults[prevIndex].pageNumber);
+  };
+
+  const textRenderer = useCallback((textItem: any) => {
+    if (!searchQuery) return textItem.str;
+    const regex = new RegExp(`(${searchQuery})`, 'gi');
+    return textItem.str.replace(regex, (match: string) => `<mark>${match}</mark>`);
+  }, [searchQuery]);
   
   const isBookmarked = bookmarks.includes(pageNumber);
 
@@ -160,6 +242,51 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         </TooltipProvider>
         <h1 className="font-headline text-lg truncate mx-4 flex-1 text-center">{file.name}</h1>
         <div className="flex items-center gap-2">
+             <div className="relative flex items-center">
+                <Input
+                    type="search"
+                    placeholder="Search document..."
+                    className="h-9 w-40 sm:w-64 pr-10"
+                    value={searchQuery}
+                    onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        if(e.target.value === '') {
+                            setSearchResults([]);
+                            setCurrentResultIndex(-1);
+                        }
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    disabled={isSearching}
+                />
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute right-0 top-0 h-9 w-10 text-muted-foreground" 
+                    onClick={handleSearch}
+                    disabled={isSearching}
+                >
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+            </div>
+            {searchResults.length > 0 && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <span>{currentResultIndex + 1}/{searchResults.length}</span>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToPrevResult}><ChevronUp/></Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Previous Match</p></TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToNextResult}><ChevronRight/></Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Next Match</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+            )}
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -184,6 +311,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             scale={zoom}
             renderTextLayer={true}
             renderAnnotationLayer={true}
+            customTextRenderer={textRenderer}
             loading={<Skeleton className="h-[842px] w-[595px]" />}
            />}
         </Document>
@@ -198,7 +326,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                     <TooltipContent><p>Zoom Out</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                    <TooltipTrigger asChild><Button variant="outline" className="w-20">{(zoom * 100).toFixed(0)}%</Button></TooltipTrigger>
+                    <TooltipTrigger asChild><Button variant="outline" className="w-20" onClick={() => setZoom(1)}>{(zoom * 100).toFixed(0)}%</Button></TooltipTrigger>
                     <TooltipContent><p>Reset Zoom</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
