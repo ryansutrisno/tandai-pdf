@@ -88,22 +88,22 @@ export default function Home() {
         onDragLeave={handleDragLeave}
       >
         <Card className={`shadow-2xl border-2 ${isDragging ? 'border-primary' : 'border-transparent'} transition-all duration-300`}>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <div className="flex justify-center items-center mb-4">
-              <BookOpenText className="w-16 h-16 text-primary" />
+              <BookOpenText className="w-12 h-12 sm:w-16 sm:h-16 text-primary" />
             </div>
-            <CardTitle className="font-headline text-4xl">Tandai PDF</CardTitle>
-            <CardDescription className="text-muted-foreground pt-2">
+            <CardTitle className="font-headline text-3xl sm:text-4xl">Tandai PDF</CardTitle>
+            <CardDescription className="text-muted-foreground pt-2 text-sm sm:text-base">
               Your personal PDF reader with smart bookmarking.
               <br/>
               Pick up right where you left off, every time.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-6 p-8">
-            <div className={`flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg ${isDragging ? 'border-primary bg-primary/10' : 'border-border bg-card'} transition-colors duration-300`}>
-                <FileUp className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="font-semibold text-foreground">Drag & drop your PDF here</p>
-                <p className="text-muted-foreground text-sm">or</p>
+          <CardContent className="flex flex-col items-center gap-6 p-4 sm:p-8">
+            <div className={`flex flex-col items-center justify-center w-full p-6 sm:p-8 border-2 border-dashed rounded-lg ${isDragging ? 'border-primary bg-primary/10' : 'border-border bg-card'} transition-colors duration-300`}>
+                <FileUp className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mb-4" />
+                <p className="font-semibold text-foreground text-sm sm:text-base">Drag & drop your PDF here</p>
+                <p className="text-muted-foreground text-xs sm:text-sm">or</p>
             </div>
             <Button size="lg" asChild>
               <label htmlFor="file-upload" className="cursor-pointer">

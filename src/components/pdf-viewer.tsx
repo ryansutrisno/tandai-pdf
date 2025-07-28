@@ -242,13 +242,13 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                 <TooltipContent><p>Back to file selection</p></TooltipContent>
             </Tooltip>
         </TooltipProvider>
-        <h1 className="font-headline text-lg truncate mx-4 flex-1 text-center">{file.name}</h1>
-        <div className="flex items-center gap-2">
+        <h1 className="font-headline text-lg truncate mx-2 sm:mx-4 flex-1 text-center">{file.name}</h1>
+        <div className="flex items-center gap-1 sm:gap-2">
              <div className="relative flex items-center">
                 <Input
                     type="search"
-                    placeholder="Search document..."
-                    className="h-9 w-40 sm:w-64 pr-10"
+                    placeholder="Search..."
+                    className="h-9 w-28 sm:w-40 md:w-64 pr-10"
                     value={searchQuery}
                     onChange={(e) => {
                         setSearchQuery(e.target.value);
@@ -272,7 +272,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             </div>
             {searchResults.length > 0 && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <span>{currentResultIndex + 1}/{searchResults.length}</span>
+                    <span className="hidden sm:inline">{currentResultIndex + 1}/{searchResults.length}</span>
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -289,19 +289,21 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                     </TooltipProvider>
                 </div>
             )}
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={handleFullScreen}><Expand /></Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Toggle Fullscreen</p></TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <div className="hidden sm:flex items-center">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleFullScreen}><Expand /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Toggle Fullscreen</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
              <ThemeToggle />
         </div>
       </header>
 
-      <main ref={viewerRef} className="flex-1 overflow-auto p-4">
+      <main ref={viewerRef} className="flex-1 overflow-auto p-2 sm:p-4">
         <Document
           file={file}
           onLoadSuccess={onDocumentLoadSuccess}
@@ -321,8 +323,8 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
       </main>
 
       <footer className="p-2 border-t bg-card shadow-sm z-10 flex-shrink-0">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="max-w-4xl mx-auto flex items-center justify-center sm:justify-between gap-2 flex-wrap">
+          <div className="hidden sm:flex items-center gap-2">
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}><ZoomOut /></Button></TooltipTrigger>
@@ -347,7 +349,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                 </Tooltip>
             </TooltipProvider>
             <div className="flex items-center gap-1 text-sm">
-                <Input type="number" value={pageNumber} onChange={handlePageInputChange} className="w-16 h-9 text-center" />
+                <Input type="number" value={pageNumber} onChange={handlePageInputChange} className="w-14 h-9 text-center" />
                 <span>of {numPages || '...'}</span>
             </div>
             <TooltipProvider>
