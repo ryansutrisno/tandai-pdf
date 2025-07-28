@@ -91,13 +91,11 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
       }
     } catch (error) {
       console.error("Failed to load reading state", error);
-      toast({
-        title: "Error",
-        description: "Could not load your saved reading position.",
-        variant: "destructive",
-      });
+      // We can't call toast here directly as it would be a side-effect in render
+      // A separate effect could handle this, or we could just log it.
+      // For now, console.error is safe.
     }
-  }, [file, storageKey, toast]);
+  }, [storageKey]);
 
   // Save state to localStorage
   useEffect(() => {
@@ -128,6 +126,14 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
     setIsLoading(false);
   };
 
+  const onDocumentLoadError = useCallback((error: Error) => {
+     toast({
+        title: "Error loading PDF",
+        description: error.message,
+        variant: "destructive"
+      });
+  }, [toast]);
+
   const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
   const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages || 1));
 
@@ -139,17 +145,16 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   };
 
   const toggleBookmark = () => {
+    const isCurrentlyBookmarked = bookmarks.includes(pageNumber);
     setBookmarks(prev => {
-      const newBookmarks = prev.includes(pageNumber)
+      const newBookmarks = isCurrentlyBookmarked
         ? prev.filter(p => p !== pageNumber)
         : [...prev, pageNumber];
-      
-      toast({
-        title: prev.includes(pageNumber) ? "Bookmark removed" : "Bookmark added",
-        description: `Page ${pageNumber} has ${prev.includes(pageNumber) ? 'been unbookmarked' : 'been bookmarked'}.`,
-      });
-
       return newBookmarks.sort((a, b) => a - b);
+    });
+    toast({
+        title: isCurrentlyBookmarked ? "Bookmark removed" : "Bookmark added",
+        description: `Page ${pageNumber} has ${isCurrentlyBookmarked ? 'been unbookmarked' : 'been bookmarked'}.`,
     });
   };
 
@@ -180,8 +185,6 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
               const pageText = textContent.items.map(item => (item as TextItem).str).join(' ').toLowerCase();
 
               if (pageText.includes(searchText)) {
-                  // Simple search: just add the page number if found
-                  // For more complex search, we'd need to find specific matches
                   results.push({ pageNumber: i });
               }
           }
@@ -307,7 +310,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         <Document
           file={file}
           onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={(error) => toast({ title: "Error loading PDF", description: error.message, variant: "destructive" })}
+          onLoadError={onDocumentLoadError}
           className="flex justify-center"
           loading={<div className="flex flex-col items-center justify-center h-full gap-4 text-lg"><Loader2 className="animate-spin h-8 w-8" />Loading document...</div>}
         >
