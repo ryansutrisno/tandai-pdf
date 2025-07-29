@@ -1,0 +1,38 @@
+diff --git a/node_modules/next/dist/client/app-index.js b/node_modules/next/dist/client/app-index.js
+index 2874136..705c7fc 100644
+--- a/node_modules/next/dist/client/app-index.js
++++ b/node_modules/next/dist/client/app-index.js
+@@ -370,6 +370,12 @@
+         if (isInitialRender) {
+             if (window.next.version !== "development" && React.version !== reactDevRuntime.version) {
+                 console.warn("Mismatched versions of React are loaded." + " This can lead to unexpected behavior." + " You are likely seeing this warning because you have loaded React on your own," + " or because another library is including its own copy of React." + " Read more here: https://nextjs.org/docs/messages/react-version-mismatch");
++            }
++            // There are some external scripts that are known to inject themselves into the page and modify the DOM, which can cause hydration mismatches.
++            // We have a list of known offenders and will suppress the warning if they are present.
++            const knownOffenders = [
++                "cz-shortcut-listen"
++            ];
++            if (knownOffenders.some((offender)=>document.body.hasAttribute(offender))) {
++                return;
+             }
+             // TODO-APP: remove this logic when PPR is the default
+             if (window.next.ppr) {
+diff --git a/node_modules/next/dist/esm/client/app-index.js b/node_modules/next/dist/esm/client/app-index.js
+index 725a3d4..7ff7a89 100644
+--- a/node_modules/next/dist/esm/client/app-index.js
++++ b/node_modules/next/dist/esm/client/app-index.js
+@@ -369,6 +369,12 @@
+         if (isInitialRender) {
+             if (window.next.version !== "development" && React.version !== reactDevRuntime.version) {
+                 console.warn("Mismatched versions of React are loaded." + " This can lead to unexpected behavior." + " You are likely seeing this warning because you have loaded React on your own," + " or because another library is including its own copy of React." + " Read more here: https://nextjs.org/docs/messages/react-version-mismatch");
++            }
++            // There are some external scripts that are known to inject themselves into the page and modify the DOM, which can cause hydration mismatches.
++            // We have a list of known offenders and will suppress the warning if they are present.
++            const knownOffenders = [
++                "cz-shortcut-listen"
++            ];
++            if (knownOffenders.some((offender)=>document.body.hasAttribute(offender))) {
++                return;
+             }
+             // TODO-APP: remove this logic when PPR is the default
+             if (window.next.ppr) {
