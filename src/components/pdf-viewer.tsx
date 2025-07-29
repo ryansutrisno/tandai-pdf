@@ -65,6 +65,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -82,7 +83,10 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         const { page, scrollTop, bookmarks: savedBookmarks, zoom: savedZoom } = JSON.parse(savedState) as DocInfo;
         setPageNumber(page || 1);
         setBookmarks(savedBookmarks || []);
-        setZoom(savedZoom || 1);
+        // Don't set zoom from storage on initial load for mobile, we'll calculate it
+        if (window.innerWidth >= 768) {
+             setZoom(savedZoom || 1);
+        }
         setTimeout(() => {
           if (viewerRef.current) {
             viewerRef.current.scrollTop = scrollTop || 0;
@@ -133,6 +137,16 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         variant: "destructive"
       });
   }, [toast]);
+
+  const onPageLoadSuccess = (page: any) => {
+      if (isInitialLoad && window.innerWidth < 768) {
+          const viewerWidth = viewerRef.current?.clientWidth ?? window.innerWidth;
+          // Add some padding to the calculation
+          const scale = (viewerWidth / page.width) * 0.95;
+          setZoom(scale);
+          setIsInitialLoad(false);
+      }
+  };
 
   const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
   const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages || 1));
@@ -321,13 +335,14 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             renderAnnotationLayer={true}
             customTextRenderer={textRenderer}
             loading={<Skeleton className="h-[842px] w-[595px]" />}
+            onLoadSuccess={onPageLoadSuccess}
            />}
         </Document>
       </main>
 
       <footer className="p-2 border-t bg-card shadow-sm z-10 flex-shrink-0">
         <div className="max-w-4xl mx-auto flex items-center justify-center sm:justify-between gap-2 flex-wrap">
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2 order-2 sm:order-1">
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}><ZoomOut /></Button></TooltipTrigger>
@@ -344,7 +359,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             </TooltipProvider>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 order-1 sm:order-2">
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={goToPrevPage} disabled={pageNumber <= 1}><ChevronLeft /></Button></TooltipTrigger>
@@ -363,7 +378,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             </TooltipProvider>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 order-3">
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={toggleBookmark} className={isBookmarked ? "text-accent" : ""}><BookMarked className={`transition-all duration-300 ${isBookmarked ? 'fill-accent' : ''}`} /></Button></TooltipTrigger>
@@ -395,3 +410,5 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
     </div>
   );
 }
+
+    
