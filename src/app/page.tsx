@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileUp, BookOpenText, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,11 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [isLoadingFromUrl, setIsLoadingFromUrl] = useState(false);
   const { toast } = useToast();
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -198,7 +203,7 @@ export default function Home() {
         </main>
         <footer className="w-full p-4 text-center">
             <p className="text-sm text-muted-foreground">
-                &copy; {new Date().getFullYear()} Tandai PDF. Dibuat dengan ❤️ oleh Studio Firebase.
+                {currentYear && <>© {currentYear} Tandai PDF. Dibuat dengan ❤️ oleh Studio Firebase.</>}
             </p>
         </footer>
     </div>
