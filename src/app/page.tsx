@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from 'react';
-import { FileUp, BookOpenText } from 'lucide-react';
+import { FileUp, BookOpenText, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -36,13 +38,20 @@ const PdfViewerLoading = () => (
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [url, setUrl] = useState('');
+  const [isLoadingFromUrl, setIsLoadingFromUrl] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile && selectedFile.type === 'application/pdf') {
       setFile(selectedFile);
     } else {
-      alert('Please select a PDF file.');
+      toast({
+          title: "Invalid File",
+          description: "Please select a PDF file.",
+          variant: "destructive"
+      });
       setFile(null);
     }
   };
@@ -55,7 +64,11 @@ export default function Home() {
     if (droppedFile && droppedFile.type === 'application/pdf') {
         setFile(droppedFile);
     } else {
-        alert('Please select a PDF file.');
+        toast({
+            title: "Invalid File",
+            description: "Please drop a PDF file.",
+            variant: "destructive"
+        });
         setFile(null);
     }
   };
@@ -71,6 +84,42 @@ export default function Home() {
     event.stopPropagation();
     setIsDragging(false);
   }
+
+  const handleUrlLoad = async () => {
+    if (!url) {
+        toast({
+            title: "Invalid URL",
+            description: "Please enter a URL.",
+            variant: "destructive"
+        });
+        return;
+    }
+    setIsLoadingFromUrl(true);
+    try {
+        // Basic URL validation
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.statusText}`);
+        }
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/pdf')) {
+            throw new Error('The URL does not point to a PDF file.');
+        }
+
+        const blob = await response.blob();
+        const fileName = url.substring(url.lastIndexOf('/') + 1) || 'document.pdf';
+        const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
+        setFile(pdfFile);
+    } catch (error: any) {
+        toast({
+            title: "Failed to load PDF from URL",
+            description: error.message || "Please check the URL and try again.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsLoadingFromUrl(false);
+    }
+  };
 
   if (file) {
     return <PdfViewer file={file} onBack={() => setFile(null)} />;
@@ -100,10 +149,35 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-6 p-4 sm:p-8">
+            <div className="w-full space-y-2">
+                <div className="flex items-center gap-2">
+                    <Link className="w-5 h-5 text-muted-foreground" />
+                    <p className="font-semibold text-foreground text-sm sm:text-base">Load from Web Address</p>
+                </div>
+                <div className="flex gap-2">
+                    <Input 
+                        type="url" 
+                        placeholder="https://example.com/document.pdf"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleUrlLoad()}
+                        disabled={isLoadingFromUrl}
+                    />
+                    <Button onClick={handleUrlLoad} disabled={isLoadingFromUrl}>
+                        {isLoadingFromUrl ? 'Loading...' : 'Load'}
+                    </Button>
+                </div>
+            </div>
+
+            <div className="w-full flex items-center gap-2">
+                <div className="flex-1 border-t border-border"></div>
+                <p className="text-muted-foreground text-xs sm:text-sm">OR</p>
+                <div className="flex-1 border-t border-border"></div>
+            </div>
+
             <div className={`flex flex-col items-center justify-center w-full p-6 sm:p-8 border-2 border-dashed rounded-lg ${isDragging ? 'border-primary bg-primary/10' : 'border-border bg-card'} transition-colors duration-300`}>
                 <FileUp className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mb-4" />
                 <p className="font-semibold text-foreground text-sm sm:text-base">Drag & drop your PDF here</p>
-                <p className="text-muted-foreground text-xs sm:text-sm">or</p>
             </div>
             <Button size="lg" asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
