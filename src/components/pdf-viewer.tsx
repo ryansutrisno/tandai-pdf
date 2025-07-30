@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -32,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
 import { ThemeToggle } from '@/components/theme-toggle';
+import type { StoredFile } from '@/lib/db';
 
 // Set up worker to avoid issues with bundlers
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -40,7 +42,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 interface PdfViewerProps {
-  file: File;
+  storedFile: StoredFile;
   onBack: () => void;
 }
 
@@ -53,10 +55,9 @@ interface DocInfo {
 
 interface SearchResult {
   pageNumber: number;
-  // We don't need detailed position info for now, just navigating is enough
 }
 
-export default function PdfViewer({ file, onBack }: PdfViewerProps) {
+export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [zoom, setZoom] = useState<number>(1);
@@ -73,37 +74,44 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
   const [isSearching, setIsSearching] = useState(false);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
 
-  const storageKey = `tandai-pdf-${file.name}`;
+  const storageKey = `tandai-pdf-${storedFile.name}`;
 
   // Load state from localStorage
   useEffect(() => {
+    let stateLoaded = false;
     try {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
         const { page, scrollTop, bookmarks: savedBookmarks, zoom: savedZoom } = JSON.parse(savedState) as DocInfo;
         setPageNumber(page || 1);
         setBookmarks(savedBookmarks || []);
-        // Don't set zoom from storage on initial load for mobile, we'll calculate it
-        if (window.innerWidth >= 768) {
-             setZoom(savedZoom || 1);
+        
+        const isMobile = window.innerWidth < 768;
+        if (!isMobile) {
+          setZoom(savedZoom || 1);
         }
+
         setTimeout(() => {
           if (viewerRef.current) {
             viewerRef.current.scrollTop = scrollTop || 0;
           }
         }, 500);
+        stateLoaded = true;
       }
     } catch (error) {
       console.error("Failed to load reading state", error);
-      // We can't call toast here directly as it would be a side-effect in render
-      // A separate effect could handle this, or we could just log it.
-      // For now, console.error is safe.
+      // Defer toast to avoid render-cycle updates
+      setTimeout(() => toast({
+        title: "Could not load saved state",
+        description: "Your previous reading position could not be restored.",
+        variant: "destructive",
+      }), 0);
     }
-  }, [storageKey]);
+  }, [storageKey, toast]);
 
   // Save state to localStorage
   useEffect(() => {
-    if(isLoading) return;
+    if(isLoading || isInitialLoad) return;
     
     const saveState = () => {
       try {
@@ -120,9 +128,10 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
       }
     };
     
+    // Debounce saving
     const handler = setTimeout(saveState, 500);
     return () => clearTimeout(handler);
-  }, [pageNumber, bookmarks, zoom, storageKey, isLoading]);
+  }, [pageNumber, bookmarks, zoom, storageKey, isLoading, isInitialLoad]);
 
   const onDocumentLoadSuccess = (pdf: PDFDocumentProxy) => {
     pdfRef.current = pdf;
@@ -137,26 +146,41 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
         variant: "destructive"
       });
   }, [toast]);
-
-  const onPageLoadSuccess = (page: any) => {
-      if (isInitialLoad && window.innerWidth < 768) {
-          const viewerWidth = viewerRef.current?.clientWidth ?? window.innerWidth;
-          // Add some padding to the calculation
-          const scale = (viewerWidth / page.width) * 0.95;
-          setZoom(scale);
-          setIsInitialLoad(false);
+  
+  const onPageLoadSuccess = useCallback((page: any) => {
+      if (isInitialLoad) {
+        const isMobile = window.innerWidth < 768;
+        const savedState = localStorage.getItem(storageKey);
+        // Only auto-zoom if it's the very first time on mobile
+        if (isMobile && !savedState) {
+            const viewerWidth = viewerRef.current?.clientWidth ?? window.innerWidth;
+            const scale = (viewerWidth / page.width) * 0.95;
+            setZoom(scale);
+        }
+        setIsInitialLoad(false);
       }
-  };
+  }, [isInitialLoad, storageKey]);
+
 
   const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
   const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages || 1));
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if(!e.target.value) {
+        setPageNumber(0);
+        return;
+    }
     const newPage = parseInt(e.target.value, 10);
     if (!isNaN(newPage) && newPage > 0 && newPage <= (numPages || 1)) {
       setPageNumber(newPage);
     }
   };
+  
+  const handlePageInputBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if(e.target.value === '' || parseInt(e.target.value, 10) === 0){
+          setPageNumber(1);
+      }
+  }
 
   const toggleBookmark = () => {
     const isCurrentlyBookmarked = bookmarks.includes(pageNumber);
@@ -242,8 +266,13 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
 
   const textRenderer = useCallback((textItem: any) => {
     if (!searchQuery) return textItem.str;
-    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return textItem.str.replace(regex, (match: string) => `<mark>${match}</mark>`);
+    try {
+        const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return textItem.str.replace(regex, (match: string) => `<mark>${match}</mark>`);
+    } catch (e) {
+        // Invalid regex, just return original string
+        return textItem.str;
+    }
   }, [searchQuery]);
   
   const isBookmarked = bookmarks.includes(pageNumber);
@@ -256,10 +285,10 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft /></Button>
                 </TooltipTrigger>
-                <TooltipContent><p>Back to file selection</p></TooltipContent>
+                <TooltipContent><p>Back to Library</p></TooltipContent>
             </Tooltip>
         </TooltipProvider>
-        <h1 className="font-headline text-lg truncate mx-2 sm:mx-4 flex-1 text-center">{file.name}</h1>
+        <h1 className="font-headline text-lg truncate mx-2 sm:mx-4 flex-1 text-center">{storedFile.name}</h1>
         <div className="flex items-center gap-1 sm:gap-2">
              <div className="relative flex items-center">
                 <Input
@@ -288,8 +317,8 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                 </Button>
             </div>
             {searchResults.length > 0 && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <span className="hidden sm:inline">{currentResultIndex + 1}/{searchResults.length}</span>
+                <div className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+                    <span>{currentResultIndex + 1}/{searchResults.length}</span>
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -322,7 +351,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
 
       <main ref={viewerRef} className="flex-1 overflow-auto p-2 sm:p-4">
         <Document
-          file={file}
+          file={storedFile.file}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           className="flex justify-center"
@@ -334,7 +363,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
             renderTextLayer={true}
             renderAnnotationLayer={true}
             customTextRenderer={textRenderer}
-            loading={<Skeleton className="h-[842px] w-[595px]" />}
+            loading={<Skeleton className="h-[842px] w-[595px] bg-muted-foreground/20" />}
             onLoadSuccess={onPageLoadSuccess}
            />}
         </Document>
@@ -367,7 +396,7 @@ export default function PdfViewer({ file, onBack }: PdfViewerProps) {
                 </Tooltip>
             </TooltipProvider>
             <div className="flex items-center gap-1 text-sm">
-                <Input type="number" value={pageNumber} onChange={handlePageInputChange} className="w-14 h-9 text-center" />
+                <Input type="number" value={pageNumber === 0 ? '' : pageNumber} onBlur={handlePageInputBlur} onChange={handlePageInputChange} className="w-14 h-9 text-center" />
                 <span>of {numPages || '...'}</span>
             </div>
             <TooltipProvider>
