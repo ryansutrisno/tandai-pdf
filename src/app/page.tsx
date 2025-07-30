@@ -171,7 +171,7 @@ export default function Home() {
         }
 
         const blob = await response.blob();
-        let fileName = url.substring(url.lastIndexOf('/') + 1) || 'document.pdf';
+        let fileName = url.substring(url.lastIndexOf('/') + 1).split('?')[0] || 'document.pdf';
         if (!fileName.toLowerCase().endsWith('.pdf')) {
             fileName += '.pdf';
         }
@@ -331,4 +331,5 @@ export default function Home() {
         </footer>
     </div>
   );
-}
+
+    
