@@ -77,6 +77,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
   const [isSearching, setIsSearching] = useState(false);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const { t } = useLanguage();
+  const [isPageChanging, setIsPageChanging] = useState(false);
 
   const storageKey = `tandai-pdf-${storedFile.name}`;
 
@@ -155,11 +156,12 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
   }, [toast, t]);
   
   const onPageLoadSuccess = useCallback((page: any) => {
+      setIsPageChanging(false);
       if (isInitialLoad) {
         const isMobile = window.innerWidth < 768;
         // Auto-zoom on mobile for the first time
         if (isMobile) {
-            const viewerWidth = viewerRef.current?.clientWidth ?? window.innerWidth;
+            const viewerWidth = viewerRef.current?.clientWidth || window.innerWidth;
             const scale = (viewerWidth / page.width) * 0.95;
             setZoom(scale);
         }
@@ -167,9 +169,19 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
       }
   }, [isInitialLoad]);
 
+  const changePage = (newPage: number) => {
+    if (newPage === pageNumber || newPage <= 0 || (numPages && newPage > numPages)) return;
+    setIsPageChanging(true);
+    setTimeout(() => {
+        setPageNumber(newPage);
+        if (viewerRef.current) {
+            viewerRef.current.scrollTop = 0;
+        }
+    }, 150);
+  }
 
-  const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
-  const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages || 1));
+  const goToPrevPage = () => changePage(pageNumber - 1);
+  const goToNextPage = () => changePage(pageNumber + 1);
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if(!e.target.value) {
@@ -178,7 +190,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
     }
     const newPage = parseInt(e.target.value, 10);
     if (!isNaN(newPage) && newPage > 0 && newPage <= (numPages || 1)) {
-      setPageNumber(newPage);
+      changePage(newPage);
     }
   };
   
@@ -236,7 +248,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
           setSearchResults(results);
           if (results.length > 0) {
               setCurrentResultIndex(0);
-              setPageNumber(results[0].pageNumber);
+              changePage(results[0].pageNumber);
           } else {
               setCurrentResultIndex(-1);
               toast({
@@ -260,14 +272,14 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
       if (searchResults.length === 0) return;
       const nextIndex = (currentResultIndex + 1) % searchResults.length;
       setCurrentResultIndex(nextIndex);
-      setPageNumber(searchResults[nextIndex].pageNumber);
+      changePage(searchResults[nextIndex].pageNumber);
   };
 
   const goToPrevResult = () => {
       if (searchResults.length === 0) return;
       const prevIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
       setCurrentResultIndex(prevIndex);
-      setPageNumber(searchResults[prevIndex].pageNumber);
+      changePage(searchResults[prevIndex].pageNumber);
   };
 
   const textRenderer = useCallback((textItem: any) => {
@@ -363,15 +375,18 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
           className="flex justify-center"
           loading={<div className="flex flex-col items-center justify-center h-full gap-4 text-lg"><Loader2 className="animate-spin h-8 w-8" />{t('loading_document')}...</div>}
         >
-          {!isLoading && <Page 
-            pageNumber={pageNumber} 
-            scale={zoom}
-            renderTextLayer={true}
-            renderAnnotationLayer={true}
-            customTextRenderer={textRenderer}
-            loading={<Skeleton className="h-[842px] w-[595px] bg-muted-foreground/20" />}
-            onLoadSuccess={onPageLoadSuccess}
-           />}
+          <div className={`transition-opacity duration-300 ${isPageChanging ? 'opacity-0' : 'opacity-100'}`}>
+            {!isLoading && <Page 
+              key={pageNumber} // Adding key forces a re-render
+              pageNumber={pageNumber} 
+              scale={zoom}
+              renderTextLayer={true}
+              renderAnnotationLayer={true}
+              customTextRenderer={textRenderer}
+              loading={<Skeleton className="h-[842px] w-[595px] bg-muted-foreground/20" />}
+              onLoadSuccess={onPageLoadSuccess}
+            />}
+          </div>
         </Document>
       </main>
 
@@ -430,7 +445,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
                             <ScrollArea className="h-40">
                                 <div className="grid gap-1">
                                     {bookmarks.map(p => (
-                                        <Button key={p} variant="ghost" className="justify-start" onClick={() => setPageNumber(p)}>{t('page')} {p}</Button>
+                                        <Button key={p} variant="ghost" className="justify-start" onClick={() => changePage(p)}>{t('page')} {p}</Button>
                                     ))}
                                 </div>
                             </ScrollArea>
