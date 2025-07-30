@@ -11,7 +11,6 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
-  Bookmark,
   BookMarked,
   ArrowLeft,
   Expand,
@@ -34,6 +33,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from './ui/skeleton';
 import { ThemeToggle } from '@/components/theme-toggle';
 import type { StoredFile } from '@/lib/db';
+import { useLanguage } from '@/context/language-context';
+import { LanguageToggle } from './language-toggle';
+
 
 // Set up worker to avoid issues with bundlers
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -67,18 +69,19 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [errorToToast, setErrorToToast] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(-1);
   const [isSearching, setIsSearching] = useState(false);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
+  const { t } = useLanguage();
 
   const storageKey = `tandai-pdf-${storedFile.name}`;
 
   // Load state from localStorage
   useEffect(() => {
-    let stateLoaded = false;
     try {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
@@ -96,18 +99,23 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
             viewerRef.current.scrollTop = scrollTop || 0;
           }
         }, 500);
-        stateLoaded = true;
       }
     } catch (error) {
       console.error("Failed to load reading state", error);
-      // Defer toast to avoid render-cycle updates
-      setTimeout(() => toast({
-        title: "Could not load saved state",
-        description: "Your previous reading position could not be restored.",
-        variant: "destructive",
-      }), 0);
+      setErrorToToast(t('load_state_error_desc'));
     }
-  }, [storageKey, toast]);
+  }, [storageKey, t]);
+
+  useEffect(() => {
+      if (errorToToast) {
+          toast({
+              title: t('load_state_error_title'),
+              description: errorToToast,
+              variant: "destructive",
+          });
+          setErrorToToast(null);
+      }
+  }, [errorToToast, toast, t]);
 
   // Save state to localStorage
   useEffect(() => {
@@ -128,7 +136,6 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
       }
     };
     
-    // Debounce saving
     const handler = setTimeout(saveState, 500);
     return () => clearTimeout(handler);
   }, [pageNumber, bookmarks, zoom, storageKey, isLoading, isInitialLoad]);
@@ -141,25 +148,24 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
 
   const onDocumentLoadError = useCallback((error: Error) => {
      toast({
-        title: "Error loading PDF",
+        title: t('pdf_load_error_title'),
         description: error.message,
         variant: "destructive"
       });
-  }, [toast]);
+  }, [toast, t]);
   
   const onPageLoadSuccess = useCallback((page: any) => {
       if (isInitialLoad) {
         const isMobile = window.innerWidth < 768;
-        const savedState = localStorage.getItem(storageKey);
-        // Only auto-zoom if it's the very first time on mobile
-        if (isMobile && !savedState) {
+        // Auto-zoom on mobile for the first time
+        if (isMobile) {
             const viewerWidth = viewerRef.current?.clientWidth ?? window.innerWidth;
             const scale = (viewerWidth / page.width) * 0.95;
             setZoom(scale);
         }
         setIsInitialLoad(false);
       }
-  }, [isInitialLoad, storageKey]);
+  }, [isInitialLoad]);
 
 
   const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
@@ -191,8 +197,8 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
       return newBookmarks.sort((a, b) => a - b);
     });
     toast({
-        title: isCurrentlyBookmarked ? "Bookmark removed" : "Bookmark added",
-        description: `Page ${pageNumber} has ${isCurrentlyBookmarked ? 'been unbookmarked' : 'been bookmarked'}.`,
+        title: isCurrentlyBookmarked ? t('bookmark_removed_title') : t('bookmark_added_title'),
+        description: t(isCurrentlyBookmarked ? 'bookmark_removed_desc' : 'bookmark_added_desc', { pageNumber }),
     });
   };
 
@@ -234,15 +240,15 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
           } else {
               setCurrentResultIndex(-1);
               toast({
-                  title: "Not Found",
-                  description: `The phrase "${searchQuery}" was not found in the document.`,
+                  title: t('search_not_found_title'),
+                  description: t('search_not_found_desc', { query: searchQuery }),
               });
           }
       } catch (error) {
           console.error("Error during search:", error);
           toast({
-              title: "Search Error",
-              description: "An error occurred while searching the document.",
+              title: t('search_error_title'),
+              description: t('search_error_desc'),
               variant: "destructive",
           });
       } finally {
@@ -270,7 +276,6 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
         const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         return textItem.str.replace(regex, (match: string) => `<mark>${match}</mark>`);
     } catch (e) {
-        // Invalid regex, just return original string
         return textItem.str;
     }
   }, [searchQuery]);
@@ -285,7 +290,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft /></Button>
                 </TooltipTrigger>
-                <TooltipContent><p>Back to Library</p></TooltipContent>
+                <TooltipContent><p>{t('back_to_library')}</p></TooltipContent>
             </Tooltip>
         </TooltipProvider>
         <h1 className="font-headline text-lg truncate mx-2 sm:mx-4 flex-1 text-center">{storedFile.name}</h1>
@@ -293,7 +298,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
              <div className="relative flex items-center">
                 <Input
                     type="search"
-                    placeholder="Search..."
+                    placeholder={`${t('search_placeholder')}...`}
                     className="h-9 w-28 sm:w-40 md:w-64 pr-10"
                     value={searchQuery}
                     onChange={(e) => {
@@ -324,13 +329,13 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToPrevResult}><ChevronUp/></Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Previous Match</p></TooltipContent>
+                            <TooltipContent><p>{t('prev_match')}</p></TooltipContent>
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToNextResult}><ChevronDown/></Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Next Match</p></TooltipContent>
+                            <TooltipContent><p>{t('next_match')}</p></TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                 </div>
@@ -341,10 +346,11 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
                         <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" onClick={handleFullScreen}><Expand /></Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>Toggle Fullscreen</p></TooltipContent>
+                        <TooltipContent><p>{t('toggle_fullscreen')}</p></TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
             </div>
+             <LanguageToggle />
              <ThemeToggle />
         </div>
       </header>
@@ -355,7 +361,7 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           className="flex justify-center"
-          loading={<div className="flex flex-col items-center justify-center h-full gap-4 text-lg"><Loader2 className="animate-spin h-8 w-8" />Loading document...</div>}
+          loading={<div className="flex flex-col items-center justify-center h-full gap-4 text-lg"><Loader2 className="animate-spin h-8 w-8" />{t('loading_document')}...</div>}
         >
           {!isLoading && <Page 
             pageNumber={pageNumber} 
@@ -371,19 +377,19 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
 
       <footer className="p-2 border-t bg-card shadow-sm z-10 flex-shrink-0">
         <div className="max-w-4xl mx-auto flex items-center justify-center sm:justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 order-2 sm:order-1">
+          <div className="flex items-center gap-1 sm:gap-2 order-2 sm:order-1">
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}><ZoomOut /></Button></TooltipTrigger>
-                    <TooltipContent><p>Zoom Out</p></TooltipContent>
+                    <TooltipContent><p>{t('zoom_out')}</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" className="w-20" onClick={() => setZoom(1)}>{(zoom * 100).toFixed(0)}%</Button></TooltipTrigger>
-                    <TooltipContent><p>Reset Zoom</p></TooltipContent>
+                    <TooltipContent><p>{t('reset_zoom')}</p></TooltipContent>
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setZoom(z => Math.min(5, z + 0.25))}><ZoomIn /></Button></TooltipTrigger>
-                    <TooltipContent><p>Zoom In</p></TooltipContent>
+                    <TooltipContent><p>{t('zoom_in')}</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
           </div>
@@ -392,17 +398,17 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={goToPrevPage} disabled={pageNumber <= 1}><ChevronLeft /></Button></TooltipTrigger>
-                    <TooltipContent><p>Previous Page</p></TooltipContent>
+                    <TooltipContent><p>{t('prev_page')}</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
             <div className="flex items-center gap-1 text-sm">
                 <Input type="number" value={pageNumber === 0 ? '' : pageNumber} onBlur={handlePageInputBlur} onChange={handlePageInputChange} className="w-14 h-9 text-center" />
-                <span>of {numPages || '...'}</span>
+                <span>{t('of_pages', { numPages: numPages || '...' })}</span>
             </div>
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={goToNextPage} disabled={!numPages || pageNumber >= numPages}><ChevronRight /></Button></TooltipTrigger>
-                    <TooltipContent><p>Next Page</p></TooltipContent>
+                    <TooltipContent><p>{t('next_page')}</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
           </div>
@@ -411,20 +417,20 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={toggleBookmark} className={isBookmarked ? "text-accent" : ""}><BookMarked className={`transition-all duration-300 ${isBookmarked ? 'fill-accent' : ''}`} /></Button></TooltipTrigger>
-                    <TooltipContent><p>{isBookmarked ? 'Remove Bookmark' : 'Bookmark Page'}</p></TooltipContent>
+                    <TooltipContent><p>{isBookmarked ? t('remove_bookmark') : t('add_bookmark')}</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
 
             {bookmarks.length > 0 && (
                 <Popover>
-                    <PopoverTrigger asChild><Button variant="outline">Bookmarks ({bookmarks.length})</Button></PopoverTrigger>
+                    <PopoverTrigger asChild><Button variant="outline">{t('bookmarks_button', { count: bookmarks.length })}</Button></PopoverTrigger>
                     <PopoverContent className="w-60" align="end">
                         <div className="grid gap-4">
-                            <h4 className="font-medium leading-none">Bookmarked Pages</h4>
+                            <h4 className="font-medium leading-none">{t('bookmarked_pages_title')}</h4>
                             <ScrollArea className="h-40">
                                 <div className="grid gap-1">
                                     {bookmarks.map(p => (
-                                        <Button key={p} variant="ghost" className="justify-start" onClick={() => setPageNumber(p)}>Page {p}</Button>
+                                        <Button key={p} variant="ghost" className="justify-start" onClick={() => setPageNumber(p)}>{t('page')} {p}</Button>
                                     ))}
                                 </div>
                             </ScrollArea>
@@ -439,5 +445,3 @@ export default function PdfViewer({ storedFile, onBack }: PdfViewerProps) {
     </div>
   );
 }
-
-    
