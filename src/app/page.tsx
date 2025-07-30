@@ -2,10 +2,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { FileUp, BookOpenText, Link, Trash2, Library, PlusCircle } from 'lucide-react';
+import { FileUp, BookOpenText, Trash2, Library, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -41,8 +40,6 @@ const PdfViewerLoading = () => (
 export default function Home() {
   const [activeFile, setActiveFile] = useState<StoredFile | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [url, setUrl] = useState('');
-  const [isLoadingFromUrl, setIsLoadingFromUrl] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
@@ -57,8 +54,8 @@ export default function Home() {
       const existingFile = await db.files.where('name').equalsIgnoreCase(file.name).first();
       if (existingFile) {
         toast({
-          title: "File already exists",
-          description: `"${file.name}" is already in your library. Opening it instead.`,
+          title: "File sudah ada",
+          description: `"${file.name}" sudah ada di perpustakaan. Membuka file...`,
         });
         openFile(existingFile);
         return;
@@ -74,14 +71,14 @@ export default function Home() {
         openFile(newFile);
       }
       toast({
-        title: "File Added",
-        description: `"${file.name}" has been added to your library.`,
+        title: "File Ditambahkan",
+        description: `"${file.name}" telah ditambahkan ke perpustakaan Anda.`,
       });
     } catch (error) {
-      console.error("Failed to add file to db", error);
+      console.error("Gagal menambahkan file ke db", error);
       toast({
-        title: "Database Error",
-        description: "Could not save the file to the library.",
+        title: "Error Database",
+        description: "Tidak dapat menyimpan file ke perpustakaan.",
         variant: "destructive"
       });
     }
@@ -93,8 +90,8 @@ export default function Home() {
       addFileToDb(selectedFile);
     } else if (selectedFile) {
       toast({
-          title: "Invalid File",
-          description: "Please select a PDF file.",
+          title: "File Tidak Valid",
+          description: "Silakan pilih file PDF.",
           variant: "destructive"
       });
     }
@@ -109,8 +106,8 @@ export default function Home() {
         addFileToDb(droppedFile);
     } else if(droppedFile) {
         toast({
-            title: "Invalid File",
-            description: "Please drop a PDF file.",
+            title: "File Tidak Valid",
+            description: "Silakan jatuhkan file PDF.",
             variant: "destructive"
         });
     }
@@ -127,67 +124,6 @@ export default function Home() {
     event.stopPropagation();
     setIsDragging(false);
   }
-
-  const handleUrlLoad = async () => {
-    if (!url) {
-        toast({
-            title: "Invalid URL",
-            description: "Please enter a URL.",
-            variant: "destructive"
-        });
-        return;
-    }
-    setIsLoadingFromUrl(true);
-
-    let finalUrl = url;
-    // Handle Google Drive links
-    if (url.includes('drive.google.com')) {
-      const match = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) {
-        const fileId = match[1];
-        finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-      } else {
-         toast({
-            title: "Invalid Google Drive URL",
-            description: "The URL format is not recognized. Please use a valid share link.",
-            variant: "destructive"
-        });
-        setIsLoadingFromUrl(false);
-        return;
-      }
-    }
-
-
-    try {
-        const response = await fetch(`/api/cors-proxy?url=${encodeURIComponent(finalUrl)}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch: ${response.statusText}`);
-        }
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/pdf')) {
-             const text = await response.text();
-             console.error("Non-PDF content received:", text);
-            throw new Error('The URL does not point to a PDF file. Check browser console for more details.');
-        }
-
-        const blob = await response.blob();
-        let fileName = url.substring(url.lastIndexOf('/') + 1).split('?')[0] || 'document.pdf';
-        if (!fileName.toLowerCase().endsWith('.pdf')) {
-            fileName += '.pdf';
-        }
-        const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
-        addFileToDb(pdfFile);
-        setUrl('');
-    } catch (error: any) {
-        toast({
-            title: "Failed to load PDF from URL",
-            description: error.message || "Please check the URL and CORS policy of the server.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsLoadingFromUrl(false);
-    }
-  };
   
   const openFile = async (file: StoredFile) => {
     await db.files.update(file.id!, { lastOpened: new Date() });
@@ -195,17 +131,17 @@ export default function Home() {
   }
 
   const deleteFile = async (id: number, event: React.MouseEvent) => {
-      event.stopPropagation(); // prevent opening the file
+      event.stopPropagation(); // mencegah file terbuka
       try {
         await db.files.delete(id);
         toast({
-            title: "File Deleted",
-            description: "The file has been removed from your library."
+            title: "File Dihapus",
+            description: "File telah dihapus dari perpustakaan Anda."
         })
       } catch (error) {
         toast({
-            title: "Error Deleting File",
-            description: "Could not remove the file.",
+            title: "Error Menghapus File",
+            description: "Tidak dapat menghapus file.",
             variant: 'destructive'
         })
       }
@@ -234,73 +170,44 @@ export default function Home() {
                     </div>
                     <CardTitle className="font-headline text-3xl sm:text-4xl text-center">Tandai PDF</CardTitle>
                     <CardDescription className="text-muted-foreground pt-2 text-sm sm:text-base text-center">
-                        Your personal PDF library with smart bookmarking.
+                        Perpustakaan PDF pribadi Anda dengan penanda buku cerdas.
                         <br/>
-                        Pick up right where you left off, every time.
+                        Lanjutkan membaca dari halaman terakhir, setiap saat.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-6 p-4 sm:p-8">
-                    <div className="w-full max-w-2xl space-y-4">
-                        <div className="flex items-center gap-2">
-                            <PlusCircle className="w-5 h-5 text-muted-foreground" />
-                            <p className="font-semibold text-foreground text-sm sm:text-base">Add New PDF to Library</p>
-                        </div>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Link className="w-4 h-4" />
-                                    <p>From Web Address</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Input 
-                                        type="url" 
-                                        placeholder="https://example.com/document.pdf"
-                                        value={url}
-                                        onChange={(e) => setUrl(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleUrlLoad()}
-                                        disabled={isLoadingFromUrl}
-                                    />
-                                    <Button onClick={handleUrlLoad} disabled={isLoadingFromUrl}>
-                                        {isLoadingFromUrl ? 'Loading...' : 'Load'}
-                                    </Button>
-                                </div>
+                    <div className="w-full max-w-md">
+                        <label 
+                            htmlFor="file-upload" 
+                            className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-secondary transition-colors"
+                        >
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground" />
+                                <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold text-primary">Klik untuk mengunggah</span> atau seret dan jatuhkan</p>
+                                <p className="text-xs text-muted-foreground">Hanya file PDF yang didukung</p>
                             </div>
-                            <div className="space-y-2">
-                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <FileUp className="w-4 h-4" />
-                                    <p>From Your Device</p>
-                                </div>
-                                <Button size="lg" asChild className="w-full">
-                                    <label htmlFor="file-upload" className="cursor-pointer">
-                                        Select PDF From Device
-                                    </label>
-                                </Button>
-                                <input
+                            <input
                                 id="file-upload"
                                 type="file"
                                 accept="application/pdf"
                                 onChange={handleFileChange}
                                 className="hidden"
-                                />
-                            </div>
-                        </div>
-                         <p className="text-center text-muted-foreground text-xs sm:text-sm">
-                            Or drag & drop a PDF file anywhere on this page.
-                        </p>
+                            />
+                        </label>
                     </div>
 
-                    <div className="w-full border-t border-border my-4"></div>
+                    <div className="w-full border-t border-border my-2"></div>
 
                     <div className="w-full max-w-4xl space-y-4">
                         <div className="flex items-center gap-2">
                             <Library className="w-6 h-6 text-muted-foreground" />
-                            <h2 className="font-headline text-2xl text-foreground">Your Library</h2>
+                            <h2 className="font-headline text-2xl text-foreground">Perpustakaan Anda</h2>
                         </div>
-                        {storedFiles === undefined && <p>Loading library...</p>}
+                        {storedFiles === undefined && <p>Memuat perpustakaan...</p>}
                         {storedFiles && storedFiles.length === 0 && (
                             <div className="text-center text-muted-foreground py-8">
-                                <p>Your library is empty.</p>
-                                <p>Add a PDF to get started.</p>
+                                <p>Perpustakaan Anda kosong.</p>
+                                <p>Tambahkan file PDF untuk memulai.</p>
                             </div>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -313,7 +220,7 @@ export default function Home() {
                                        <BookOpenText className="w-16 h-16 text-primary mb-2"/>
                                        <p className="font-semibold text-sm break-all">{file.name}</p>
                                        <p className="text-xs text-muted-foreground mt-1">
-                                           Last opened: {file.lastOpened.toLocaleDateString()}
+                                           Terakhir dibuka: {file.lastOpened.toLocaleDateString()}
                                        </p>
                                    </CardContent>
                                </Card>
@@ -326,10 +233,9 @@ export default function Home() {
         </main>
         <footer className="w-full p-4 text-center">
             <p className="text-sm text-muted-foreground">
-                {currentYear && <>© {currentYear} Tandai PDF. Made with ❤️ by <a href='https://ryansutrisno.com' target='_blank' rel='noreferrer'>Ryan Sutrisno</a>.</>}
+                {currentYear && <>© {currentYear} Tandai PDF. Dibuat dengan ❤️ oleh <a href='https://ryansutrisno.com' target='_blank' rel='noreferrer'>Ryan Sutrisno</a>.</>}
             </p>
         </footer>
     </div>
   );
-
-    
+}
