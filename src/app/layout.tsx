@@ -3,10 +3,39 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
 
+const APP_NAME = 'Tandai PDF';
+const APP_DESCRIPTION = 'Your personal PDF reader with smart bookmarking.';
+
 export const metadata: Metadata = {
-  title: 'Tandai PDF',
-  description: 'Your personal PDF reader with smart bookmarking.',
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    siteName: APP_NAME,
+    title: {
+      default: APP_NAME,
+      template: `%s - ${APP_NAME}`
+    },
+    description: APP_DESCRIPTION,
+    images: [
+      {
+        url: 'https://placehold.co/1200x630.png',
+        width: 1200,
+        height: 630,
+        alt: 'Tandai PDF Cover Image',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: {
+      default: APP_NAME,
+      template: `%s - ${APP_NAME}`
+    },
+    description: APP_DESCRIPTION,
+    images: ['https://placehold.co/1200x630.png'],
+  },
 };
 
 export default function RootLayout({
