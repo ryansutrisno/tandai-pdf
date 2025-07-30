@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { BookOpenText, Trash2, Library, UploadCloud, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpenText, Trash2, Library, UploadCloud, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/context/language-context';
 import { LanguageToggle } from '@/components/language-toggle';
+import { Input } from '@/components/ui/input';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), {
   ssr: false,
@@ -45,20 +46,26 @@ export default function Home() {
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const { t } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const storedFiles = useLiveQuery(() => db.files.toArray(), []);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
+  
   const sortedFiles = storedFiles?.sort((a, b) => b.lastOpened.getTime() - a.lastOpened.getTime()) || [];
-  const totalPages = Math.ceil(sortedFiles.length / itemsPerPage);
-  const paginatedFiles = sortedFiles.slice(
+
+  const filteredFiles = sortedFiles.filter(file =>
+    file.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredFiles.length / itemsPerPage);
+  const paginatedFiles = filteredFiles.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  
+
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
@@ -164,6 +171,12 @@ export default function Home() {
       }
   }
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+    setCurrentPage(1); // Reset to first page on new search
+  };
+
+
   if (activeFile) {
     return <PdfViewer storedFile={activeFile} onBack={() => setActiveFile(null)} />;
   }
@@ -217,17 +230,39 @@ export default function Home() {
                     <div className="w-full border-t border-border my-2"></div>
 
                     <div className="w-full max-w-4xl space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Library className="w-6 h-6 text-muted-foreground" />
-                            <h2 className="font-headline text-2xl text-foreground">{t('library_title')}</h2>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <Library className="w-6 h-6 text-muted-foreground" />
+                                <h2 className="font-headline text-2xl text-foreground">{t('library_title')}</h2>
+                            </div>
+                             <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    placeholder={t('search_placeholder') + '...'}
+                                    className="pl-10 w-full sm:w-64"
+                                    value={searchQuery}
+                                    onChange={handleSearchChange}
+                                />
+                            </div>
                         </div>
+
                         {storedFiles === undefined && <p>{t('library_loading')}</p>}
+                        
                         {storedFiles && storedFiles.length === 0 && (
                             <div className="text-center text-muted-foreground py-8">
                                 <p>{t('library_empty_1')}</p>
                                 <p>{t('library_empty_2')}</p>
                             </div>
                         )}
+                        
+                        {storedFiles && storedFiles.length > 0 && paginatedFiles.length === 0 && (
+                            <div className="text-center text-muted-foreground py-8">
+                                <p>{t('search_not_found_title')}</p>
+                                <p>{t('search_not_found_desc', { query: searchQuery })}</p>
+                            </div>
+                        )}
+
                         <div className="space-y-3">
                            {paginatedFiles.map(file => (
                                <div key={file.id} className="group flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary transition-colors cursor-pointer" onClick={() => openFile(file)}>
@@ -282,4 +317,3 @@ export default function Home() {
     </div>
   );
 }
-
