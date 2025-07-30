@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { BookOpenText, Trash2, Library, UploadCloud } from 'lucide-react';
+import { BookOpenText, Trash2, Library, UploadCloud, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +48,17 @@ export default function Home() {
 
   const storedFiles = useLiveQuery(() => db.files.toArray(), []);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const sortedFiles = storedFiles?.sort((a, b) => b.lastOpened.getTime() - a.lastOpened.getTime()) || [];
+  const totalPages = Math.ceil(sortedFiles.length / itemsPerPage);
+  const paginatedFiles = sortedFiles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
@@ -141,6 +152,9 @@ export default function Home() {
             title: t('file_deleted_title'),
             description: t('file_deleted_desc')
         })
+        if (paginatedFiles.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
       } catch (error) {
         toast({
             title: t('file_delete_error_title'),
@@ -214,22 +228,47 @@ export default function Home() {
                                 <p>{t('library_empty_2')}</p>
                             </div>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                           {storedFiles?.sort((a,b) => b.lastOpened.getTime() - a.lastOpened.getTime()).map(file => (
-                               <Card key={file.id} className="cursor-pointer hover:shadow-lg hover:border-primary transition-all group" onClick={() => openFile(file)}>
-                                   <CardContent className="p-4 flex flex-col items-center text-center relative">
-                                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => deleteFile(file.id!, e)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                       <BookOpenText className="w-16 h-16 text-primary mb-2"/>
-                                       <p className="font-semibold text-sm break-all">{file.name}</p>
-                                       <p className="text-xs text-muted-foreground mt-1">
-                                           {t('last_opened')}: {file.lastOpened.toLocaleDateString()}
-                                       </p>
-                                   </CardContent>
-                               </Card>
+                        <div className="space-y-3">
+                           {paginatedFiles.map(file => (
+                               <div key={file.id} className="group flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary transition-colors cursor-pointer" onClick={() => openFile(file)}>
+                                   <div className="flex items-center gap-4 min-w-0">
+                                        <BookOpenText className="w-8 h-8 text-primary flex-shrink-0"/>
+                                        <div className="flex-grow min-w-0">
+                                           <p className="font-semibold text-sm sm:text-base truncate">{file.name}</p>
+                                           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                                               {t('last_opened')}: {file.lastOpened.toLocaleDateString()}
+                                           </p>
+                                        </div>
+                                   </div>
+                                   <Button variant="destructive" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onClick={(e) => deleteFile(file.id!, e)}>
+                                       <Trash2 className="h-4 w-4" />
+                                   </Button>
+                               </div>
                            ))}
                         </div>
+                        {totalPages > 1 && (
+                            <div className="flex justify-center items-center gap-4 pt-4">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setCurrentPage(p => p - 1)}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4 mr-2" />
+                                    {t('prev_page')}
+                                </Button>
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    {t('page_of_pages', { currentPage, totalPages })}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setCurrentPage(p => p + 1)}
+                                    disabled={currentPage === totalPages}
+                                >
+                                     {t('next_page')}
+                                     <ChevronRight className="h-4 w-4 ml-2" />
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
                 </Card>
@@ -237,9 +276,10 @@ export default function Home() {
         </main>
         <footer className="w-full p-4 text-center">
             <p className="text-sm text-muted-foreground">
-                {currentYear && <>© {currentYear} {t('app_title')}. {t('footer_credit')} <a href='https://ryansutrisno.com' target='_blank' rel='noreferrer'>Ryan Sutrisno</a>.</>}
+                {currentYear !== null && <>© {currentYear} {t('app_title')}. {t('footer_credit')} <a href='https://ryansutrisno.com' target='_blank' rel='noreferrer'>Ryan Sutrisno</a>.</>}
             </p>
         </footer>
     </div>
   );
 }
+

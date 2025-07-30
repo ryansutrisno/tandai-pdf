@@ -1,3 +1,4 @@
+
 const translations: { [key: string]: { en: string; id: string } } = {
     // page.tsx
     'app_title': {
@@ -100,6 +101,10 @@ const translations: { [key: string]: { en: string; id: string } } = {
         en: 'Could not delete the file.',
         id: 'Tidak dapat menghapus file.',
     },
+    'page_of_pages': {
+        en: 'Page {{currentPage}} of {{totalPages}}',
+        id: 'Halaman {{currentPage}} dari {{totalPages}}',
+    },
     // pdf-viewer.tsx
     'load_state_error_title': {
         en: 'Could not load saved state',
@@ -182,12 +187,12 @@ const translations: { [key: string]: { en: string; id: string } } = {
         id: 'Perbesar',
     },
     'prev_page': {
-        en: 'Previous Page',
-        id: 'Halaman Sebelumnya',
+        en: 'Previous',
+        id: 'Sebelumnya',
     },
     'next_page': {
-        en: 'Next Page',
-        id: 'Halaman Berikutnya',
+        en: 'Next',
+        id: 'Berikutnya',
     },
     'of_pages': {
         en: 'of {{numPages}}',
@@ -216,3 +221,4 @@ const translations: { [key: string]: { en: string; id: string } } = {
 };
 
 export default translations;
+
