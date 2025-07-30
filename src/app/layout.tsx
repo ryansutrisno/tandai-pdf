@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     description: APP_DESCRIPTION,
     images: [
       {
-        url: 'https://placehold.co/1200x630.png',
+        url: '/tandai-app.png',
         width: 1200,
         height: 630,
         alt: 'Tandai PDF Cover Image',
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
       template: `%s - ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
-    images: ['https://placehold.co/1200x630.png'],
+    images: ['/tandai-app.png'],
   },
 };
 
@@ -51,6 +51,10 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,700;1,7..72,400;1,7..72,700&display=swap" rel="stylesheet" />
         <meta name="theme-color" content="#ffffff" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Tandai PDF" />
+        <link rel="apple-touch-icon" href="/tandai-pdf-rounded.png" />
       </head>
       <body className="font-body antialiased">
         <ThemeProvider
