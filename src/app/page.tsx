@@ -54,12 +54,13 @@ export default function Home() {
   
   const addFileToDb = async (file: File) => {
     try {
-      const existingFile = await db.files.get({ name: file.name });
+      const existingFile = await db.files.where('name').equalsIgnoreCase(file.name).first();
       if (existingFile) {
         toast({
           title: "File already exists",
-          description: `"${file.name}" is already in your library.`,
+          description: `"${file.name}" is already in your library. Opening it instead.`,
         });
+        openFile(existingFile);
         return;
       }
 
@@ -68,6 +69,10 @@ export default function Home() {
         file: file,
         lastOpened: new Date(),
       });
+      const newFile = await db.files.get(id);
+      if (newFile) {
+        openFile(newFile);
+      }
       toast({
         title: "File Added",
         description: `"${file.name}" has been added to your library.`,
@@ -133,8 +138,28 @@ export default function Home() {
         return;
     }
     setIsLoadingFromUrl(true);
+
+    let finalUrl = url;
+    // Handle Google Drive links
+    if (url.includes('drive.google.com')) {
+      const match = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        const fileId = match[1];
+        finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      } else {
+         toast({
+            title: "Invalid Google Drive URL",
+            description: "The URL format is not recognized. Please use a valid share link.",
+            variant: "destructive"
+        });
+        setIsLoadingFromUrl(false);
+        return;
+      }
+    }
+
+
     try {
-        const response = await fetch(`/api/cors-proxy?url=${encodeURIComponent(url)}`);
+        const response = await fetch(`/api/cors-proxy?url=${encodeURIComponent(finalUrl)}`);
         if (!response.ok) {
             throw new Error(`Failed to fetch: ${response.statusText}`);
         }
@@ -146,7 +171,10 @@ export default function Home() {
         }
 
         const blob = await response.blob();
-        const fileName = url.substring(url.lastIndexOf('/') + 1) || 'document.pdf';
+        let fileName = url.substring(url.lastIndexOf('/') + 1) || 'document.pdf';
+        if (!fileName.toLowerCase().endsWith('.pdf')) {
+            fileName += '.pdf';
+        }
         const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
         addFileToDb(pdfFile);
         setUrl('');
@@ -304,5 +332,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
