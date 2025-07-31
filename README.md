@@ -78,7 +78,7 @@ Tandai PDF is a modern, Progressive Web App (PWA) that provides an intuitive PDF
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/ryansutrisno/tandai-pdf
+   git clone https://github.com/ryansutrisno/tandai-pdf.git
    cd tandai-pdf
    ```
 2. **Install dependencies**
